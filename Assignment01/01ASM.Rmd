@@ -1,0 +1,191 @@
+---
+title: "Advanced Statistical Modeling"
+author: "Saul Garcia, Krishna Kalyan"
+date: "September 21, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## First Set of Exercises for ASM
+
+### Central Limit Theorem
+
+1. Generate 1000 samples of size 15 of a Binomial(10,0.35) distribution. For each sample compute $x_bar$. Plot the histogram of the $x_bar$ values. Repeat the same procedure but with a sample size equal to 50. What do you observe in the two histograms?
+
+```{r, eval = T}
+#Function for binomial
+hist_binomial <- function(samples, size, mean, sd){
+  data = matrix(rbinom(size,mean,sd), nrow=samples, ncol = size)
+  hist(rowMeans(data), main= paste0("Histogram of Binomial with size ",size))
+}
+
+par(mfrow=c(2,2))
+sizes = c(15,50,100,1000)
+for(i in 1:length(sizes)){
+  hist_binomial(1000,sizes[i],10,.35)
+}
+```
+
+**Observations**:   
+By having more samples, we prove the Central Limit Theorem, the histrogram starts to shape as a normal distribution with its mean in 3.5
+
+2. Repeat the first exercise but in this case the samples come from a Poisson distribution with parameter $\lambda = 6$
+
+```{r, eval = T}
+#Function for poisson
+hist_poisson <- function(samples, size, lambda){
+  data = matrix(rpois(size,lambda), nrow=samples, ncol = size)
+  hist(rowMeans(data), main= paste0("Histogram of Poisson with size ",size))
+}
+
+par(mfrow=c(2,2))
+sizes = c(15,50,100,1000)
+for(i in 1:length(sizes)){
+  hist_poisson(1000,sizes[i],6)
+}
+```
+
+**Observations**:   
+One again, by having a few instances of  the Poisson distribution, we can not even see the data close to the $\lambda = 6$ as we were expecting. But by increasing the `size` or `instances` of each sample: we prove the Central Limit Theorem, the histrogram starts to shape as a normal distribution with its mean in 6, as our $\lambda$.
+
+### Variance vs. Variance Estimator
+Objective: Check that in order that the variance estimator be an unbiased estimator of the theoretical variance, it is necessary to divide by $n - 1$ instead of $n$.
+
+3. Generate 1000 samples of size 10 of a Normal distribution of parameters $\mu = 30$ and $\sigma^2 = 1.5$. For each sample compute:
+
+$$S^2_{1} = \frac{1}{n-1} \sum\limits_{i=1}(x_{i}-\bar{x}) \, \, and \, \, S^2_{2} = \frac{1}{n} \sum\limits_{i=1}(x_{i}-\bar{x})$$
+
+```{r, warning=FALSE, eval=T}
+var1 <- function(x){
+  1/(length(x)-1)* sum((x - mean(x))^2)
+}
+var2 <- function(x){
+  1/(length(x))* sum((x - mean(x))^2)
+}
+
+
+#Function for Normal
+normal_variances <- function(sample, size, mean, sd){
+  set.seed(1)
+  normal = replicate(size,rnorm(sample,mean,sd))
+  variances1 = apply(normal,1, var1 )
+  variances2 = apply(normal,1, var2 )
+  
+  par(mfrow=c(1,2))
+  
+  hist(variances1, main = "Sample Variance 1/(n-1)  ", 
+     xlab = paste0("variances with mean ", round(mean(variances1),2)))
+  hist(variances2, main = "Population Variance with 1/n", 
+     xlab = paste0("variances with mean ", round(mean(variances2),2)))
+  title(paste0("Histograms for populations size ", size), side = 3,line = -1, outer= TRUE)
+}
+
+population_size = c(10,500)
+for(i in 1:length(population_size)){
+  
+  normal_variances(1000,population_size[i],30,sqrt(1.5))
+}
+
+```
+
+**Observations**:   
+Here we can see that the Sample Variance, $S_{1}^2$, has a closer aproximation to the real variance $\sigma^2 = 1.5$ when the data size is small. And the Population variance seems a bit off. In the contrary, if we increase the size of the datasets, we can observe how the `Sample Variance` and the `Population Variance` become both exactly the `Real Variance`.
+
+### Confidence Interval
+
+4. Compute analitically the confidence interval for the parameter $\mu$ associated to a sample size of $n$ of a Normal distributed random variable. Generate 100 samples from a Normal($\mu = 12$, $\sigma^2 = 3$) distribution. How many of the sample variances belong to the interval?
+
+```{r}
+#Samples of size n
+size = 10
+sample = 100
+mean = 12
+sd = sqrt(3)
+std_error_mean = sd/sqrt(size)
+alfa = 0.05
+Z = qnorm(1-(alfa/2))
+
+
+#Generate normal data and compute sample mean
+normal_mean <- function(sample, size, mean, sd){
+  set.seed(1)
+  normal = replicate(size,rnorm(sample,mean,sd))
+  xbar = apply(normal,1, mean )
+  xbar
+}
+
+#Generate sample means
+sample_mean = normal_mean(sample, size, mean, sd)
+
+#Confidence interval for the mean
+lower_limit = mean - Z*std_error_mean
+upper_limit = mean + Z*std_error_mean
+
+table(sample_mean > lower_limit & sample_mean< upper_limit)
+hist(sample_mean, col="lightblue")
+abline(v=lower_limit,col="red",lwd=2)
+abline(v=upper_limit,col="red",lwd=2)
+```
+
+94 out of the 100 `sample means` belong to the interval, as we are having 95% confidence interval, if we increase the size of the data, `n`, from which each `sample mean` was computed, then the 95% of the sample means will tend to be inside the interval.
+
+5. Compute analitically the confidence interval for the parameter $\sigma^2$ associated to a sample size of $n$ of a Normal distributed random variable. Generate 100 samples from a Normal($\mu = 12$, $\sigma^2 = 3$) distribution. How many of the sample variances belong to the interval?
+
+```{r,eval=T}
+# We consider the same information as the the confidence interval for the mean
+Xsq_low = qchisq(1-(alfa/2),size-1)
+Xsq_up = qchisq(alfa/2,size-1)
+
+#Generate normal data and compute sample mean
+normal_var <- function(sample, size, mean, sd){
+  set.seed(1)
+  normal = replicate(size,rnorm(sample,mean,sd))
+  var = apply(normal,1, var )
+  var
+}
+
+#Generate sample means
+sample_var = normal_var(sample, size, mean, sd)
+
+#Confidence interval for the mean
+lower_limit_var = sd^2*(size-1)/Xsq_low
+upper_limit_var = sd^2*(size-1)/Xsq_up
+
+table(sample_var > lower_limit_var & sample_var< upper_limit_var)
+hist(sample_var, col="lightblue", xlim = c(0,10))
+abline(v=lower_limit_var,col="red",lwd=2)
+abline(v=upper_limit_var,col="red",lwd=2)
+```
+
+90 out of the 100 `sample variances` lie within the confidence interval for parameter $\sigma^2$. Again if we increase the size of the samples, then 95% of the sample variances will tend to be in the confidence interval.
+
+### Mean and Median
+
+6. Prove that the mean is the value that minimizes sum of the squared error. Prove that the median is the value that minimizes the sum of the absolute error. In the later case, for simplicity, assume a sample of just three values.
+
+```{r}
+#Lets generate data
+data = rnorm(3, 12, sqrt(3))
+data
+
+#Get mean and median
+data_mean = mean(data)
+data_median = median(data)
+
+#Prove with the squared error formula
+min_squared_error_mean = sum((data - data_mean)^2)
+min_squeared_error_median = sum((data - data_median)^2)
+
+#Does the mean minimizes the sum of squared error?
+min_squared_error_mean < min_squeared_error_median
+
+#Prove with the absolute value
+min_absolute_mean =  sum(abs(data - data_mean))
+min_absolute_median = sum(abs(data - data_median))
+
+#Does the median minimizes the sum of absolute error?
+min_absolute_median < min_absolute_mean
+```
